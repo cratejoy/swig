@@ -5,7 +5,6 @@ tests/browser/swig.pack.js
 tests/browser/*.test.js
 lib-cov/*
 tests/coverage.html
-dist/*
 tmp_build/*
 docs/css/*
 browser/test/tests.js
