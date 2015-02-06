@@ -3505,11 +3505,23 @@ exports.spaceless = require('./spaceless');
  * @param {...arguments} arguments  User-defined arguments.
  */
 exports.compile = function (compiler, args, content, parents, options, blockName) {
-  var fnName = args.shift();
+	var fnName = args.shift();
+	var defArgs = '\n';
+	for(i=0;  i<args.length; i++) {
+		v = args.pop();
+		if(v.charAt(0) === '=') {
+			a = args.pop();
+			defArgs += 'if(' + a + ' === undefined) ' + a + '='+v.slice(1)+';\n';
+			args.push(a);
+		} else {
+			args.unshift(v);
+		}
+	}
 
   return '_ctx.' + fnName + ' = function (' + args.join('') + ') {\n' +
     '  var _output = "",\n' +
     '    __ctx = _utils.extend({}, _ctx);\n' +
+	defArgs + 
     '  _utils.each(_ctx, function (v, k) {\n' +
     '    if (["' + args.join('","') + '"].indexOf(k) !== -1) { delete _ctx[k]; }\n' +
     '  });\n' +
@@ -3555,6 +3567,26 @@ exports.parse = function (str, line, parser, types) {
   parser.on(types.COMMA, function () {
     return true;
   });
+
+	parser.on(types.ASSIGNMENT, function(token) {
+	this.state.push(types.ASSIGNMENT);
+	});
+
+	parser.on(types.NUMBER, function(token) {
+	  if(this.state.pop() == types.ASSIGNMENT) {
+		this.out.push('=' + token.match);
+	  } else {
+		  throw new Error('Unexpected number');
+	  }
+	});
+
+	parser.on(types.STRING, function(token) {
+	  if(this.state.pop() == types.ASSIGNMENT) {
+		this.out.push('=' + token.match);
+	  } else {
+		  throw new Error('Unexpected string');
+	  }
+	});
 
   parser.on('*', function () {
     return;
