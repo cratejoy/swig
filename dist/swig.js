@@ -949,6 +949,7 @@ var TYPES = {
     /** End of a method
      * Currently unused
     METHODEND: 26, */
+	KWARG: 27,
     /** Unknown type */
     UNKNOWN: 100
   },
@@ -1541,14 +1542,24 @@ TokenParser.prototype = {
       break;
 
     case _t.STRING:
-      self.filterApplyIdx.push(self.out.length);
-      self.out.push(match.replace(/\\/g, '\\\\'));
+	  if(lastState === _t.KWARG) {
+		  self.kwargs[self.prevVar] = match;
+		  self.state.pop();
+	  } else {
+		  self.filterApplyIdx.push(self.out.length);
+		  self.out.push(match.replace(/\\/g, '\\\\'));
+	  }
       break;
 
     case _t.NUMBER:
     case _t.BOOL:
-      self.filterApplyIdx.push(self.out.length);
-      self.out.push(match);
+	  if(lastState === _t.KWARG) {
+		  self.kwargs[self.prevVar] = match;
+		  self.state.pop();
+	  } else {
+		  self.filterApplyIdx.push(self.out.length);
+		  self.out.push(match);
+	  }
       break;
 
     case _t.FILTER:
@@ -1583,6 +1594,24 @@ TokenParser.prototype = {
       self.filterApplyIdx.push(self.out.length - 1);
       break;
 
+	case _t.ASSIGNMENT:
+		if(lastState === _t.FUNCTION) {
+			self.state.push(_t.KWARG);
+			if(self.kwargs === undefined) {
+				self.kwargs = {};
+			}
+			self.kwargs[self.prevVar] = undefined;
+			self.out.pop();
+			// pop any prev comma.
+			if(self.out.length && self.out[self.out.length - 1] === ', ') {
+				self.out.pop();
+				console.log('popped prev comma')
+			} else {
+				self.ignoreNextComma = true;
+			}
+		}
+		break;
+
     case _t.PARENOPEN:
 		self.state.push(token.type);
 		self.filterApplyIdx.push(self.out.length);
@@ -1610,7 +1639,10 @@ TokenParser.prototype = {
       if (lastState === _t.COLON) {
         self.state.pop();
       }
-      self.out.push(', ');
+	  if(!self.ignoreNextComma) {
+		  self.out.push(', ');
+	  }
+	  self.ignoreNextComma=false;
       self.filterApplyIdx.pop();
       break;
 
@@ -1832,6 +1864,8 @@ exports.parse = function (swig, source, opts, tags, filters) {
     var tokens = lexer.read(utils.strip(str)),
       parser,
       out;
+	var _pre = '';
+	var _post = '';
 
     parser = new TokenParser(tokens, filters, escape, line, opts.filename);
     out = parser.parse().join('');
@@ -1840,6 +1874,14 @@ exports.parse = function (swig, source, opts, tags, filters) {
       utils.throwError('Unable to parse "' + str + '"', line, opts.filename);
     }
 
+	if(parser.kwargs != undefined) {
+		_pre += '_ctx.kwargs={};\n';
+		utils.each(parser.kwargs, function(v, k){
+			_pre += '_ctx.kwargs[\'' + k + '\']=' + v + ';\n';
+		});
+		_post = 'delete _ctx.kwargs;\n';
+		delete parser['kwargs'];
+	}
     /**
      * A parsed variable token.
      * @typedef {object} VarToken
@@ -1847,7 +1889,7 @@ exports.parse = function (swig, source, opts, tags, filters) {
      */
     return {
       compile: function () {
-        return '_output += ' + out + ';\n';
+        return _pre + '_output += ' + out + ';\n' + _post;
       }
     };
   }
@@ -3506,22 +3548,34 @@ exports.spaceless = require('./spaceless');
  */
 exports.compile = function (compiler, args, content, parents, options, blockName) {
 	var fnName = args.shift();
+	
+	// Apply default arguments, if any, to undefined arguments
 	var defArgs = '\n';
 	for(i=0;  i<args.length; i++) {
 		v = args.pop();
 		if(v.charAt(0) === '=') {
 			a = args.pop();
 			defArgs += 'if(' + a + ' === undefined) ' + a + '='+v.slice(1)+';\n';
-			args.push(a);
+			args.unshift(a);
 		} else {
 			args.unshift(v);
 		}
 	}
 
+	// Apply keyword arguments if defined.
+	var kwArgs = 'if(_ctx.kwargs != undefined) {\n';
+	for(i=0;  i<args.length; i++) {
+		if(args[i].charAt(0) != ',') {
+			kwArgs += 'if(_ctx.kwargs.' + args[i] + ' != undefined) {' + args[i] + ' = _ctx.kwargs.' + args[i] + ';}\n';
+		}
+	}
+	kwArgs += '}\n';
+
   return '_ctx.' + fnName + ' = function (' + args.join('') + ') {\n' +
     '  var _output = "",\n' +
     '    __ctx = _utils.extend({}, _ctx);\n' +
 	defArgs + 
+	kwArgs + 
     '  _utils.each(_ctx, function (v, k) {\n' +
     '    if (["' + args.join('","') + '"].indexOf(k) !== -1) { delete _ctx[k]; }\n' +
     '  });\n' +
