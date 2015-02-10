@@ -211,7 +211,7 @@ exports.U = function (input) {
   return input.getTime() / 1000;
 };
 
-},{"./utils":26}],3:[function(require,module,exports){
+},{"./utils":27}],3:[function(require,module,exports){
 var utils = require('./utils'),
   dateFormatter = require('./dateformatter');
 
@@ -876,7 +876,7 @@ exports.url_decode = function (input) {
   return decodeURIComponent(input);
 };
 
-},{"./dateformatter":2,"./utils":26}],4:[function(require,module,exports){
+},{"./dateformatter":2,"./utils":27}],4:[function(require,module,exports){
 var utils = require('./utils');
 
 /**
@@ -1202,7 +1202,7 @@ exports.read = function (str) {
   return tokens;
 };
 
-},{"./utils":26}],5:[function(require,module,exports){
+},{"./utils":27}],5:[function(require,module,exports){
 var process=require("__browserify_process");var fs = require('fs'),
   path = require('path');
 
@@ -1263,7 +1263,7 @@ module.exports = function (basepath, encoding) {
   return ret;
 };
 
-},{"__browserify_process":31,"fs":28,"path":29}],6:[function(require,module,exports){
+},{"__browserify_process":32,"fs":29,"path":30}],6:[function(require,module,exports){
 /**
  * @namespace TemplateLoader
  * @description Swig is able to accept custom template loaders written by you, so that your templates can come from your favorite storage medium without needing to be part of the core library.
@@ -1383,7 +1383,7 @@ module.exports = function (mapping, basepath) {
   return ret;
 };
 
-},{"../utils":26,"path":29}],8:[function(require,module,exports){
+},{"../utils":27,"path":30}],8:[function(require,module,exports){
 var utils = require('./utils'),
   lexer = require('./lexer');
 
@@ -1561,13 +1561,8 @@ TokenParser.prototype = {
       break;
 
     case _t.STRING:
-	  if(lastState === _t.KWARG) {
-		  self.kwargs[self.prevVar] = match;
-		  self.state.pop();
-	  } else {
-		  self.filterApplyIdx.push(self.out.length);
-		  self.out.push(match.replace(/\\/g, '\\\\'));
-	  }
+	  self.filterApplyIdx.push(self.out.length);
+	  self.out.push(match.replace(/\\/g, '\\\\'));
       break;
 
 	case _t.NONE:
@@ -1579,13 +1574,8 @@ TokenParser.prototype = {
 	  if(token.type === _t.BOOL) {
 		  match = match.toLowerCase();
 	  }
-	  if(lastState === _t.KWARG) {
-		  self.kwargs[self.prevVar] = match;
-		  self.state.pop();
-	  } else {
-		  self.filterApplyIdx.push(self.out.length);
-		  self.out.push(match);
-	  }
+	  self.filterApplyIdx.push(self.out.length);
+	  self.out.push(match);
       break;
 
 	case _t.INLINE_IF:
@@ -1630,15 +1620,18 @@ TokenParser.prototype = {
 			if(self.kwargs === undefined) {
 				self.kwargs = {};
 			}
-			self.kwargs[self.prevVar] = undefined;
+
+			self.kwVar = self.prevVar;
+			self.kwargs[self.kwVar] = undefined;
 			self.out.pop();
+
 			// pop any prev comma.
 			if(self.out.length && self.out[self.out.length - 1] === ', ') {
 				self.out.pop();
-				console.log('popped prev comma')
 			} else {
 				self.ignoreNextComma = true;
 			}
+			self.kwStart = self.out.length;
 		}
 		break;
 
@@ -1660,6 +1653,12 @@ TokenParser.prototype = {
 		if(temp == _t.METHODOPEN) {
 			temp = self.state.pop();
 		}
+
+		if (temp === _t.KWARG) {
+			temp = self.state.pop();
+			self.kwargs[self.kwVar] = self.out.splice(self.kwStart).join('');
+		}
+
 		if (temp !== _t.PARENOPEN && temp !== _t.FUNCTION && temp !== _t.FILTER) {
 			utils.throwError('Mismatched nesting state', self.line, self.filename);
 		}
@@ -1671,12 +1670,19 @@ TokenParser.prototype = {
       if (lastState !== _t.FUNCTION &&
 		  lastState !== _t.METHODOPEN &&	
           lastState !== _t.FILTER &&
+          lastState !== _t.KWARG &&
           lastState !== _t.ARRAYOPEN &&
           lastState !== _t.CURLYOPEN &&
           lastState !== _t.PARENOPEN &&
           lastState !== _t.COLON) {
         utils.throwError('Unexpected comma', self.line, self.filename);
       }
+
+      if (lastState === _t.KWARG) {
+		self.state.pop();
+		self.kwargs[self.kwVar] = self.out.splice(self.kwStart).join('');
+	  }
+
       if (lastState === _t.COLON) {
         self.state.pop();
       }
@@ -2177,7 +2183,7 @@ exports.compile = function (template, parents, options, blockName) {
   return out;
 };
 
-},{"./lexer":4,"./utils":26}],9:[function(require,module,exports){
+},{"./lexer":4,"./utils":27}],9:[function(require,module,exports){
 var utils = require('./utils'),
   _tags = require('./tags'),
   _filters = require('./filters'),
@@ -2919,7 +2925,7 @@ exports.run = defaultInstance.run;
 exports.invalidateCache = defaultInstance.invalidateCache;
 exports.loaders = loaders;
 
-},{"./dateformatter":2,"./filters":3,"./loaders":6,"./parser":8,"./tags":20,"./utils":26}],10:[function(require,module,exports){
+},{"./dateformatter":2,"./filters":3,"./loaders":6,"./parser":8,"./tags":21,"./utils":27}],10:[function(require,module,exports){
 var utils = require('../utils'),
   strings = ['html', 'js'];
 
@@ -2958,7 +2964,7 @@ exports.parse = function (str, line, parser, types, stack, opts) {
 };
 exports.ends = true;
 
-},{"../utils":26}],11:[function(require,module,exports){
+},{"../utils":27}],11:[function(require,module,exports){
 /**
  * Defines a block in a template that can be overridden by a template extending this one and/or will override the current template's parent template block of the same name.
  *
@@ -2987,6 +2993,25 @@ exports.block = true;
 
 },{}],12:[function(require,module,exports){
 /**
+ *
+ */
+exports.compile = function (compiler, args, content, parents, options, blockName) {
+	var fnName = args.shift();
+	console.log('compiling call');
+	return '';
+};
+
+exports.parse = function (str, line, parser, types) {
+	var name;
+	console.log('parsing call');
+	return true;
+};
+
+exports.ends = true;
+exports.block = true;
+
+},{}],13:[function(require,module,exports){
+/**
  * Used within an <code data-language="swig">{% if %}</code> tag, the code block following this tag up until <code data-language="swig">{% endif %}</code> will be rendered if the <i>if</i> statement returns false.
  *
  * @alias else
@@ -3012,7 +3037,7 @@ exports.parse = function (str, line, parser, types, stack) {
   return (stack.length && stack[stack.length - 1].name === 'if');
 };
 
-},{}],13:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 var ifparser = require('./if').parse;
 
 /**
@@ -3042,7 +3067,7 @@ exports.parse = function (str, line, parser, types, stack) {
   return okay && (stack.length && stack[stack.length - 1].name === 'if');
 };
 
-},{"./if":17}],14:[function(require,module,exports){
+},{"./if":18}],15:[function(require,module,exports){
 /**
  * Makes the current template extend a parent template. This tag must be the first item in your template.
  *
@@ -3063,7 +3088,7 @@ exports.parse = function () {
 
 exports.ends = false;
 
-},{}],15:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 var filters = require('../filters');
 
 /**
@@ -3133,7 +3158,7 @@ exports.parse = function (str, line, parser, types) {
 
 exports.ends = true;
 
-},{"../filters":3}],16:[function(require,module,exports){
+},{"../filters":3}],17:[function(require,module,exports){
 var ctx = '_ctx.',
   ctxloop = ctx + 'loop';
 
@@ -3265,7 +3290,7 @@ exports.parse = function (str, line, parser, types) {
 
 exports.ends = true;
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 /**
  * Used to create conditional statements in templates. Accepts most JavaScript valid comparisons.
  *
@@ -3353,7 +3378,7 @@ exports.parse = function (str, line, parser, types) {
 
 exports.ends = true;
 
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 var utils = require('../utils');
 
 /**
@@ -3449,7 +3474,7 @@ exports.parse = function (str, line, parser, types, stack, opts, swig) {
 
 exports.block = true;
 
-},{"../parser":8,"../utils":26}],19:[function(require,module,exports){
+},{"../parser":8,"../utils":27}],20:[function(require,module,exports){
 var ignore = 'ignore',
   missing = 'missing',
   only = 'only';
@@ -3551,7 +3576,7 @@ exports.parse = function (str, line, parser, types, stack, opts) {
   return true;
 };
 
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 exports.autoescape = require('./autoescape');
 exports.block = require('./block');
 exports["else"] = require('./else');
@@ -3564,12 +3589,13 @@ exports["if"] = require('./if');
 exports["import"] = require('./import');
 exports.include = require('./include');
 exports.macro = require('./macro');
+exports.call = require('./call');
 exports.parent = require('./parent');
 exports.raw = require('./raw');
 exports.set = require('./set');
 exports.spaceless = require('./spaceless');
 
-},{"./autoescape":10,"./block":11,"./else":12,"./elseif":13,"./extends":14,"./filter":15,"./for":16,"./if":17,"./import":18,"./include":19,"./macro":21,"./parent":22,"./raw":23,"./set":24,"./spaceless":25}],21:[function(require,module,exports){
+},{"./autoescape":10,"./block":11,"./call":12,"./else":13,"./elseif":14,"./extends":15,"./filter":16,"./for":17,"./if":18,"./import":19,"./include":20,"./macro":22,"./parent":23,"./raw":24,"./set":25,"./spaceless":26}],22:[function(require,module,exports){
 /**
  * Create custom, reusable snippets within your templates.
  * Can be imported from one template to another using the <a href="#import"><code data-language="swig">{% import ... %}</code></a> tag.
@@ -3710,7 +3736,7 @@ exports.parse = function (str, line, parser, types) {
 exports.ends = true;
 exports.block = true;
 
-},{}],22:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 /**
  * Inject the content from the parent template's block of the same name into the current block.
  *
@@ -3763,7 +3789,7 @@ exports.parse = function (str, line, parser, types, stack, opts) {
   return true;
 };
 
-},{}],23:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 // Magic tag, hardcoded into parser
 
 /**
@@ -3788,7 +3814,7 @@ exports.parse = function (str, line, parser) {
 };
 exports.ends = true;
 
-},{}],24:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 /**
  * Set a variable for re-use in the current context. This will over-write any value already set to the context for the given <var>varname</var>.
  *
@@ -3899,7 +3925,7 @@ exports.parse = function (str, line, parser, types) {
 
 exports.block = true;
 
-},{}],25:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 var utils = require('../utils');
 
 /**
@@ -3935,7 +3961,7 @@ exports.parse = function (str, line, parser) {
 
 exports.ends = true;
 
-},{"../utils":26}],26:[function(require,module,exports){
+},{"../utils":27}],27:[function(require,module,exports){
 var isArray;
 
 /**
@@ -4121,7 +4147,7 @@ exports.throwError = function (message, line, file) {
   throw new Error(message + '.');
 };
 
-},{}],27:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 
 
 //
@@ -4339,13 +4365,13 @@ if (typeof Object.getOwnPropertyDescriptor === 'function') {
   exports.getOwnPropertyDescriptor = valueObject;
 }
 
-},{}],28:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 
 // not implemented
 // The reason for having an empty file and not throwing is to allow
 // untraditional implementation of this module.
 
-},{}],29:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 var process=require("__browserify_process");// Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -4556,7 +4582,7 @@ exports.extname = function(path) {
   return splitPath(path)[3];
 };
 
-},{"__browserify_process":31,"_shims":27,"util":30}],30:[function(require,module,exports){
+},{"__browserify_process":32,"_shims":28,"util":31}],31:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -5101,7 +5127,7 @@ function hasOwnProperty(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-},{"_shims":27}],31:[function(require,module,exports){
+},{"_shims":28}],32:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
