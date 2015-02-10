@@ -950,6 +950,8 @@ var TYPES = {
      * Currently unused
     METHODEND: 26, */
 	KWARG: 27,
+	/** None type */
+	NONE: 28,
     /** Unknown type */
     UNKNOWN: 100
   },
@@ -1059,16 +1061,22 @@ var TYPES = {
     {
       type: TYPES.BOOL,
       regex: [
-        /^(true|false)\s+/,
-        /^(true|false)$/
+        /^(true|false)/,
+        /^(True|False)/
       ],
       idx: 1
     },
     {
+      type: TYPES.NONE,
+      regex: [
+        /^None/,
+      ],
+    },
+    {
       type: TYPES.VAR,
       regex: [
-        /^[a-zA-Z_$]\w*((\.\$?\w*)+)?/,
-        /^[a-zA-Z_$]\w*/
+        /^(?!true|false|True|False|None)[a-zA-Z_$]\w*((\.\$?\w*)+)?/,
+        /^(?!true|false|True|False|None)[a-zA-Z_$]\w*/
       ]
     },
     {
@@ -1529,13 +1537,15 @@ TokenParser.prototype = {
         token.type !== _t.FILTEREMPTY) {
       self.out.push(', ');
     }
-
+	
+	/*
     if (lastState && lastState === _t.METHODOPEN) {
       self.state.pop();
       if (token.type !== _t.PARENCLOSE) {
         self.out.push(', ');
       }
     }
+	*/
 
     switch (token.type) {
     case _t.WHITESPACE:
@@ -1551,8 +1561,15 @@ TokenParser.prototype = {
 	  }
       break;
 
+	case _t.NONE:
     case _t.NUMBER:
     case _t.BOOL:
+	  if(token.type === _t.NONE) {
+		  match = 'null';
+	  }
+	  if(token.type === _t.BOOL) {
+		  match = match.toLowerCase();
+	  }
 	  if(lastState === _t.KWARG) {
 		  self.kwargs[self.prevVar] = match;
 		  self.state.pop();
@@ -1595,7 +1612,7 @@ TokenParser.prototype = {
       break;
 
 	case _t.ASSIGNMENT:
-		if(lastState === _t.FUNCTION) {
+		if(lastState === _t.FUNCTION || lastState == _t.METHODOPEN) {
 			self.state.push(_t.KWARG);
 			if(self.kwargs === undefined) {
 				self.kwargs = {};
@@ -1615,11 +1632,21 @@ TokenParser.prototype = {
     case _t.PARENOPEN:
 		self.state.push(token.type);
 		self.filterApplyIdx.push(self.out.length);
+
+		if(prevToken && prevTokenType === _t.VAR) {
+			// Method call
+			self.state.push(_t.METHODOPEN);
+		}
+		// going to need to keep a stack of vars to make it
+		// possible to have nested method / macro calls.
         self.out.push('(');
 		break;
 
     case _t.PARENCLOSE:
 		temp = self.state.pop();
+		if(temp == _t.METHODOPEN) {
+			temp = self.state.pop();
+		}
 		if (temp !== _t.PARENOPEN && temp !== _t.FUNCTION && temp !== _t.FILTER) {
 			utils.throwError('Mismatched nesting state', self.line, self.filename);
 		}
@@ -1629,6 +1656,7 @@ TokenParser.prototype = {
 
     case _t.COMMA:
       if (lastState !== _t.FUNCTION &&
+		  lastState !== _t.METHODOPEN &&	
           lastState !== _t.FILTER &&
           lastState !== _t.ARRAYOPEN &&
           lastState !== _t.CURLYOPEN &&
@@ -1666,6 +1694,7 @@ TokenParser.prototype = {
 
     case _t.VAR:
       self.parseVar(token, match, lastState);
+	  self.prevVar = match;
       break;
 
     case _t.BRACKETOPEN:
@@ -3631,6 +3660,22 @@ exports.parse = function (str, line, parser, types) {
 		this.out.push('=' + token.match);
 	  } else {
 		  throw new Error('Unexpected number');
+	  }
+	});
+
+	parser.on(types.NONE, function(token) {
+	  if(this.state.pop() == types.ASSIGNMENT) {
+		this.out.push('=null');
+	  } else {
+		  throw new Error('Unexpected none');
+	  }
+	});
+
+	parser.on(types.BOOL, function(token) {
+	  if(this.state.pop() == types.ASSIGNMENT) {
+		this.out.push('=' + token.match.toLowerCase());
+	  } else {
+		  throw new Error('Unexpected boolean');
 	  }
 	});
 
