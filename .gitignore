@@ -4,6 +4,7 @@ node_modules/*
 tests/browser/swig.pack.js
 tests/browser/*.test.js
 lib-cov/*
+dist/*
 tests/coverage.html
 tmp_build/*
 docs/css/*
