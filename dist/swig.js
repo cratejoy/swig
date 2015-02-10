@@ -952,6 +952,8 @@ var TYPES = {
 	KWARG: 27,
 	/** None type */
 	NONE: 28,
+	/** inline if */
+	INLINE_IF: 29,
     /** Unknown type */
     UNKNOWN: 100
   },
@@ -962,6 +964,12 @@ var TYPES = {
         /^\s+/
       ]
     },
+	{
+		type: TYPES.INLINE_IF,
+		regex: [
+			/^("[^"]*"|'[^']*'|[a-zA-Z0-9_\.]+)\s+if\s+(.*)\selse\s+("[^"]*"|'[^']*'|[a-zA-Z0-9_\.]+)/
+		]
+	},
     {
       type: TYPES.STRING,
       regex: [
@@ -1156,7 +1164,8 @@ function reader(str) {
       matched = {
         match: normalized,
         type: rule.type,
-        length: match[0].length
+        length: match[0].length,
+		full: match
       };
       return true;
     });
@@ -1578,6 +1587,10 @@ TokenParser.prototype = {
 		  self.out.push(match);
 	  }
       break;
+
+	case _t.INLINE_IF:
+	  self.out.push('' + token.full[2] + ' ? ' + token.full[1] + ' : ' + token.full[3]);
+	  break;
 
     case _t.FILTER:
       if (!self.filters.hasOwnProperty(match) || typeof self.filters[match] !== "function") {
